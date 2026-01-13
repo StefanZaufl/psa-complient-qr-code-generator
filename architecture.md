@@ -24,9 +24,18 @@ This document describes the architecture for a Java library that generates EPC (
    - Error correction level M (required by spec)
    - QR Version control (max Version 13)
    - Multiple character encoding support
-   - PNG/image output
+   - BitMatrix output for flexible rendering
 4. **Apache 2.0 License** - Permissive, compatible with commercial use
 5. **Continued updates** - Despite "maintenance mode", still receives updates (last release Nov 2025)
+
+### SVG Generation Approach
+
+For SVG output, we generate the SVG directly from ZXing's `BitMatrix` without additional dependencies. This approach:
+- Keeps the library lightweight (no SVG framework dependency)
+- Provides clean, minimal SVG output
+- Allows full control over SVG structure and attributes
+
+The SVG generation simply iterates over the BitMatrix and creates `<rect>` elements for each black module.
 
 **Dependencies to add:**
 ```xml
@@ -35,12 +44,9 @@ This document describes the architecture for a Java library that generates EPC (
     <artifactId>core</artifactId>
     <version>3.5.4</version>
 </dependency>
-<dependency>
-    <groupId>com.google.zxing</groupId>
-    <artifactId>javase</artifactId>
-    <version>3.5.4</version>
-</dependency>
 ```
+
+> **Note:** Only the `core` module is required. The `javase` module is not needed since we generate SVG directly from the BitMatrix.
 
 ## 3. Overall Architecture
 
@@ -57,7 +63,13 @@ The library follows a **layered architecture** with clear separation of concerns
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      DOMAIN/CORE LAYER                          │
-│  CharacterEncoding │ EpcVersion │ AmountFormatter │ Validators │
+│  CharacterEncoding │ EpcVersion │ Validators │ PayloadFormatter│
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       RENDER LAYER                              │
+│                   SvgRenderer (BitMatrix → SVG)                 │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
@@ -94,6 +106,9 @@ at.klickmagiesoftware.epcqr
 │
 ├── format/
 │   └── EpcPayloadFormatter.java      # Formats data to EPC string
+│
+├── render/
+│   └── SvgRenderer.java              # Converts BitMatrix to SVG string
 │
 └── exception/
     ├── EpcQrCodeException.java       # Base exception
@@ -155,7 +170,10 @@ public final class EpcQrCode {
 
 ### 5.3 EpcQrCodeGenerator
 
-Responsible for generating QR code images from validated data.
+Responsible for generating QR code images from validated data. The generator produces SVG output, which is ideal for:
+- Scalable, resolution-independent QR codes
+- Web and print applications
+- Easy integration with HTML/CSS
 
 ```java
 public final class EpcQrCodeGenerator {
@@ -163,18 +181,33 @@ public final class EpcQrCodeGenerator {
     // Default settings per PSA specification
     private static final ErrorCorrectionLevel ERROR_CORRECTION = ErrorCorrectionLevel.M;
     private static final int MAX_QR_VERSION = 13;
-    private static final int DEFAULT_SIZE = 300;
+    private static final int DEFAULT_MODULE_SIZE = 4;  // pixels per module
 
-    public BufferedImage generate(EpcQrCodeData data) { ... }
-    public BufferedImage generate(EpcQrCodeData data, int size) { ... }
-    public byte[] generatePng(EpcQrCodeData data) { ... }
-    public byte[] generatePng(EpcQrCodeData data, int size) { ... }
-    public void generateToFile(EpcQrCodeData data, Path outputPath) { ... }
-    public void generateToFile(EpcQrCodeData data, Path outputPath, int size) { ... }
+    // SVG generation
+    public String generateSvg(EpcQrCodeData data) { ... }
+    public String generateSvg(EpcQrCodeData data, int moduleSize) { ... }
 
     // Advanced: get the payload string without generating QR
     public String formatPayload(EpcQrCodeData data) { ... }
 }
+```
+
+**SVG Output Details:**
+
+The generated SVG has the following characteristics:
+- Each QR module is rendered as a `<rect>` element
+- Configurable module size (default: 4 pixels per module)
+- Includes proper quiet zone (4 modules) as required by QR spec
+- Clean, minimal SVG structure for easy embedding
+- Viewbox-based sizing for scalability
+
+Example SVG structure:
+```xml
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 292 292" width="292" height="292">
+  <rect width="100%" height="100%" fill="white"/>
+  <rect x="16" y="16" width="4" height="4" fill="black"/>
+  <!-- ... more modules ... -->
+</svg>
 ```
 
 ### 5.4 EpcVersion (Enum)
@@ -270,6 +303,31 @@ public final class EpcPayloadFormatter {
 
 **Line Separator Handling:** The specification allows either LF or CRLF, but requires consistency. This library uses LF (`\n`) for minimal payload size.
 
+### 5.8 SvgRenderer
+
+Converts ZXing's `BitMatrix` to SVG markup:
+
+```java
+public final class SvgRenderer {
+
+    private static final int DEFAULT_MODULE_SIZE = 4;
+    private static final int QUIET_ZONE_MODULES = 4;  // QR spec requirement
+
+    public String render(BitMatrix matrix) {
+        return render(matrix, DEFAULT_MODULE_SIZE);
+    }
+
+    public String render(BitMatrix matrix, int moduleSize) {
+        // Generates SVG with proper quiet zone and viewBox
+    }
+}
+```
+
+**Implementation Notes:**
+- Uses a single path element with multiple rectangles for efficient SVG (smaller file size)
+- Quiet zone (4 modules of white space) is included per QR code specification
+- ViewBox-based sizing ensures the SVG scales properly at any size
+
 ## 6. Data Flow
 
 ### 6.1 QR Code Generation Flow
@@ -283,9 +341,9 @@ public final class EpcPayloadFormatter {
                                                                        │
                                                                        ▼
 ┌──────────────┐     ┌─────────────┐     ┌───────────────┐     ┌──────────────┐
-│ BufferedImage│◀────│ ZXing       │◀────│ EpcPayload    │◀────│ Generator    │
-│ or PNG bytes │     │ QR encode   │     │ Formatter     │     │ receives     │
-│              │     │             │     │               │     │ data         │
+│ SVG String   │◀────│ SVG         │◀────│ ZXing         │◀────│ Generator    │
+│ (ready to    │     │ Renderer    │     │ BitMatrix     │     │ receives     │
+│ embed/save)  │     │             │     │               │     │ data         │
 └──────────────┘     └─────────────┘     └───────────────┘     └──────────────┘
 ```
 
@@ -379,16 +437,19 @@ Clear, actionable error messages:
 | `BicValidator` | BIC format (8 and 11 chars) |
 | `AmountValidator` | Range, precision, formatting |
 | `EpcPayloadFormatter` | Exact output format, encoding |
+| `SvgRenderer` | SVG structure, dimensions, module positioning |
 
 ### 10.2 Integration Tests
 
 | Test Scenario | Description |
 |---------------|-------------|
-| End-to-end generation | Generate QR → Decode → Verify content |
+| End-to-end generation | Generate SVG → Parse SVG → Decode QR → Verify content |
 | All encoding types | Test each of the 8 character encodings |
 | Version variants | V001 with BIC, V002 with/without BIC |
 | Boundary tests | Maximum payload (331 bytes) |
 | Example verification | All examples from spec must work |
+| SVG validity | Verify generated SVG is well-formed XML |
+| SVG dimensions | Verify correct viewBox and quiet zone |
 
 ### 10.3 Test Data from Specification
 
@@ -461,11 +522,8 @@ void shouldGenerateExample1FromSpec() {
 ┌───────────────────────────────────────┐
 │         EpcQrCodeGenerator            │
 ├───────────────────────────────────────┤
-│ + generate(EpcQrCodeData): Image      │
-│ + generate(data, size): Image         │
-│ + generatePng(EpcQrCodeData): byte[]  │
-│ + generatePng(data, size): byte[]     │
-│ + generateToFile(data, Path): void    │
+│ + generateSvg(EpcQrCodeData): String  │
+│ + generateSvg(data, moduleSize): Str  │
 │ + formatPayload(data): String         │
 └───────────────────────────────────────┘
          │
@@ -476,6 +534,13 @@ void shouldGenerateExample1FromSpec() {
 ├───────────────────────────────────────┤
 │ + format(EpcQrCodeData): String       │
 │ + calculatePayloadBytes(data): int    │
+└───────────────────────────────────────┘
+
+┌───────────────────────────────────────┐
+│           SvgRenderer                 │
+├───────────────────────────────────────┤
+│ + render(BitMatrix): String           │
+│ + render(BitMatrix, moduleSize): Str  │
 └───────────────────────────────────────┘
 
 ┌───────────────────┐    ┌───────────────────┐
@@ -509,7 +574,8 @@ var data = EpcQrCode.builder()
     .build();
 
 var generator = new EpcQrCodeGenerator();
-BufferedImage qrCode = generator.generate(data);
+String svg = generator.generateSvg(data);
+// svg contains the complete SVG markup ready for embedding
 ```
 
 ### 12.2 Full Example with All Fields
@@ -527,7 +593,11 @@ var data = EpcQrCode.builder()
     .build();
 
 var generator = new EpcQrCodeGenerator();
-generator.generateToFile(data, Path.of("payment-qr.png"), 400);
+// Generate with custom module size (6 pixels per module for larger output)
+String svg = generator.generateSvg(data, 6);
+
+// Save to file
+Files.writeString(Path.of("payment-qr.svg"), svg);
 ```
 
 ### 12.3 Using Text Instead of Reference
@@ -542,15 +612,51 @@ var data = EpcQrCode.builder()
     .text("Invoice #12345 - Consulting Services")
     .build();
 
-byte[] pngBytes = new EpcQrCodeGenerator().generatePng(data);
+String svg = new EpcQrCodeGenerator().generateSvg(data);
+
+// Embed in HTML
+String html = STR."""
+    <html>
+        <body>
+            <h1>Payment QR Code</h1>
+            \{svg}
+        </body>
+    </html>
+    """;
+```
+
+### 12.4 Getting Just the Payload
+
+```java
+var data = EpcQrCode.builder()
+    .version(EpcVersion.V002)
+    .encoding(CharacterEncoding.UTF_8)
+    .receiverName("Max Mustermann")
+    .iban("AT682011131032423628")
+    .amount(100.00)
+    .build();
+
+// Get the raw EPC payload string (useful for debugging or custom QR generation)
+String payload = new EpcQrCodeGenerator().formatPayload(data);
+System.out.println(payload);
+// Output:
+// BCD
+// 002
+// 1
+// SCT
+//
+// Max Mustermann
+// AT682011131032423628
+// EUR100
 ```
 
 ## 13. Future Considerations
 
-1. **SVG Output** - Could add vector graphics output for scalability
+1. **PNG/Raster Output** - Add raster image output for systems that don't support SVG
 2. **Custom Styling** - Logo embedding, color customization (within spec limits)
 3. **Batch Generation** - Multiple QR codes efficiently
 4. **Payload Optimization** - Automatic encoding selection for minimal byte usage
+5. **Visual Frame** - Add optional "Zahlen mit Code" frame per PSA specification
 
 ## 14. References
 
