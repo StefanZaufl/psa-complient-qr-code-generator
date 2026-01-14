@@ -159,16 +159,19 @@ class EpcQrCodeGeneratorTest {
 
     @Test
     void shouldRejectPayloadExceedingMaxSize() {
-        // Create data that would exceed 331 bytes
-        String longText = "A".repeat(300);
+        // Create data that exceeds 331 bytes using UTF-8 multi-byte characters
+        // German umlauts like "ü" take 2 bytes each in UTF-8
+        // So 70 "ü" chars = 140 bytes, 140 "ü" chars = 280 bytes
+        // Total: 140 + 280 + 140 = 560 bytes (well over 331)
+        String umlautChar = "ü";
 
         var data = EpcQrCode.builder()
                 .version(EpcVersion.V002)
                 .encoding(CharacterEncoding.UTF_8)
-                .receiverName("A".repeat(70))
+                .receiverName(umlautChar.repeat(70))  // 70 chars = 140 bytes in UTF-8
                 .iban("AT682011131032423628")
-                .text(longText)
-                .displayText("A".repeat(70))
+                .text(umlautChar.repeat(140))         // 140 chars = 280 bytes in UTF-8
+                .displayText(umlautChar.repeat(70))   // 70 chars = 140 bytes in UTF-8
                 .build();
 
         assertThatThrownBy(() -> generator.generateSvg(data))
