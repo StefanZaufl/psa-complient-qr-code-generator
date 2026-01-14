@@ -2,33 +2,39 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>at.klickmagiesoftware</groupId>
-  <artifactId>psa-qr-code-gen</artifactId>
+  <artifactId>epcqr</artifactId>
   <packaging>jar</packaging>
   <version>1.0.0-SNAPSHOT</version>
-  <name>psa-qr-code-gen</name>
+  <name>EPC QR Code Library</name>
+  <description>Java library for generating EPC QR Codes for SEPA Credit Transfers (PSA compliant)</description>
 
   <properties>
     <java.version>25</java.version>
-    <mockito.version>5.17.0</mockito.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <zxing.version>3.5.4</zxing.version>
+    <junit.version>5.14.2</junit.version>
+    <assertj.version>3.27.6</assertj.version>
   </properties>
 
   <dependencies>
+    <!-- QR Code Generation -->
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>${zxing.version}</version>
+    </dependency>
+
+    <!-- Testing -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
-      <version>5.12.2</version>
+      <version>${junit.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <version>${mockito.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-junit-jupiter</artifactId>
-      <version>${mockito.version}</version>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>${assertj.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -40,9 +46,13 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.13.0</version>
         <configuration>
-          <source>${java.version}</source>
-          <target>${java.version}</target>
+          <release>${java.version}</release>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.2</version>
       </plugin>
     </plugins>
   </build>
