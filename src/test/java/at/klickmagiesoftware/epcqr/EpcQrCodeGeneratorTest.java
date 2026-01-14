@@ -127,8 +127,8 @@ class EpcQrCodeGeneratorTest {
     }
 
     @ParameterizedTest
-    @EnumSource(CharacterEncoding.class)
-    void shouldGenerateSvgWithAllEncodings(CharacterEncoding encoding) {
+    @EnumSource(value = CharacterEncoding.class, names = "ISO_8859_10", mode = EnumSource.Mode.EXCLUDE)
+    void shouldGenerateSvgWithSupportedEncodings(CharacterEncoding encoding) {
         var data = EpcQrCode.builder()
                 .version(EpcVersion.V002)
                 .encoding(encoding)

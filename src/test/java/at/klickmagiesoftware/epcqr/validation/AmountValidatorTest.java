@@ -37,7 +37,7 @@ class AmountValidatorTest {
 
     @Test
     void shouldRejectAmountBelowMinimum() {
-        var result = AmountValidator.validate(new BigDecimal("0.001"));
+        var result = AmountValidator.validate(new BigDecimal("0.00"));
         assertThat(result.valid()).isFalse();
         assertThat(result.errors().getFirst()).contains("at least 0.01");
     }

@@ -126,8 +126,12 @@ String svg = new EpcQrCodeGenerator().generateSvg(data);
 - `ISO_8859_4` (code 4)
 - `ISO_8859_5` (code 5)
 - `ISO_8859_7` (code 6)
-- `ISO_8859_10` (code 7)
+- `ISO_8859_10` (code 7) - **Not available in standard Java JDK**
 - `ISO_8859_15` (code 8)
+
+> **Note:** ISO-8859-10 is defined in the PSA specification but is not available in standard Java JDK.
+> Attempting to use this encoding will throw `UnsupportedCharsetException`. Consider using
+> `ISO_8859_4` or `ISO_8859_15` as alternatives for Nordic language support.
 
 ## Field Constraints
 
