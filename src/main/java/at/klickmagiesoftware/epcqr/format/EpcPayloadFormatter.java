@@ -73,7 +73,11 @@ public final class EpcPayloadFormatter {
         sb.append(data.hasPurpose() ? data.purpose() : "").append(LINE_SEPARATOR);
 
         // Reference (optional, mutually exclusive with text)
-        sb.append(data.hasReference() ? data.reference() : "").append(LINE_SEPARATOR);
+        // Only add line separator if text or displayText follows
+        sb.append(data.hasReference() ? data.reference() : "");
+        if (data.hasText() || data.hasDisplayText()) {
+            sb.append(LINE_SEPARATOR);
+        }
 
         // Text (optional, mutually exclusive with reference)
         sb.append(data.hasText() ? data.text() : "");

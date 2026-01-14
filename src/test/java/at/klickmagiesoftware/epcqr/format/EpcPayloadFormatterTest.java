@@ -98,7 +98,8 @@ class EpcPayloadFormatterTest {
 
         String payload = EpcPayloadFormatter.format(data);
 
-        assertThat(payload).contains("REF123456\n");
+        // Reference is the last populated element, so no trailing newline (per spec)
+        assertThat(payload).endsWith("REF123456");
     }
 
     @Test
