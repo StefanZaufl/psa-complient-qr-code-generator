@@ -206,4 +206,31 @@ class EpcQrCodeTest {
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Purpose code must be exactly 4 characters");
     }
+
+    @Test
+    void shouldThrowValidationExceptionForReceiverNameWithLinebreak() {
+        var builder = EpcQrCode.builder()
+                .version(EpcVersion.V002)
+                .encoding(CharacterEncoding.UTF_8)
+                .receiverName("Max\nMustermann")
+                .iban("AT682011131032423628");
+
+        assertThatThrownBy(builder::build)
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Receiver name must not contain linebreaks");
+    }
+
+    @Test
+    void shouldThrowValidationExceptionForTextWithLinebreak() {
+        var builder = EpcQrCode.builder()
+                .version(EpcVersion.V002)
+                .encoding(CharacterEncoding.UTF_8)
+                .receiverName("Max Mustermann")
+                .iban("AT682011131032423628")
+                .text("Invoice\nPayment");
+
+        assertThatThrownBy(builder::build)
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Text must not contain linebreaks");
+    }
 }

@@ -14,13 +14,13 @@ import java.util.List;
  * <ul>
  *   <li>Version and encoding are mandatory</li>
  *   <li>BIC: mandatory for V001, optional for V002</li>
- *   <li>Receiver name: 1-70 characters, mandatory</li>
+ *   <li>Receiver name: 1-70 characters, mandatory, no linebreaks</li>
  *   <li>IBAN: valid format, mandatory</li>
  *   <li>Amount: 0.01 to 999999999.99, optional</li>
- *   <li>Purpose: 0 or 4 characters, optional</li>
- *   <li>Reference: 0-35 characters (mutually exclusive with text)</li>
- *   <li>Text: 0-140 characters (mutually exclusive with reference)</li>
- *   <li>Display text: 0-70 characters, optional</li>
+ *   <li>Purpose: 0 or 4 characters, optional, no linebreaks</li>
+ *   <li>Reference: 0-35 characters (mutually exclusive with text), no linebreaks</li>
+ *   <li>Text: 0-140 characters (mutually exclusive with reference), no linebreaks</li>
+ *   <li>Display text: 0-70 characters, optional, no linebreaks</li>
  *   <li>Total payload: max 331 bytes</li>
  * </ul>
  */
@@ -82,9 +82,14 @@ public final class EpcQrCodeValidator {
         // Receiver name validation
         if (receiverName == null || receiverName.isBlank()) {
             errors.add("Receiver name is required");
-        } else if (receiverName.length() > MAX_RECEIVER_NAME_LENGTH) {
-            errors.add("Receiver name exceeds maximum length of " + MAX_RECEIVER_NAME_LENGTH +
-                    " characters (was: " + receiverName.length() + ")");
+        } else {
+            if (receiverName.length() > MAX_RECEIVER_NAME_LENGTH) {
+                errors.add("Receiver name exceeds maximum length of " + MAX_RECEIVER_NAME_LENGTH +
+                        " characters (was: " + receiverName.length() + ")");
+            }
+            if (containsLinebreak(receiverName)) {
+                errors.add("Receiver name must not contain linebreaks");
+            }
         }
 
         // IBAN validation
@@ -100,8 +105,13 @@ public final class EpcQrCodeValidator {
         }
 
         // Purpose validation (must be exactly 4 characters if present)
-        if (purpose != null && !purpose.isBlank() && purpose.length() != PURPOSE_LENGTH) {
-            errors.add("Purpose code must be exactly " + PURPOSE_LENGTH + " characters (was: " + purpose.length() + ")");
+        if (purpose != null && !purpose.isBlank()) {
+            if (purpose.length() != PURPOSE_LENGTH) {
+                errors.add("Purpose code must be exactly " + PURPOSE_LENGTH + " characters (was: " + purpose.length() + ")");
+            }
+            if (containsLinebreak(purpose)) {
+                errors.add("Purpose must not contain linebreaks");
+            }
         }
 
         // Reference and text mutual exclusivity
@@ -112,20 +122,35 @@ public final class EpcQrCodeValidator {
             errors.add("Reference and text are mutually exclusive; only one may have content");
         }
 
-        if (hasReference && reference.length() > MAX_REFERENCE_LENGTH) {
-            errors.add("Reference exceeds maximum length of " + MAX_REFERENCE_LENGTH +
-                    " characters (was: " + reference.length() + ")");
+        if (hasReference) {
+            if (reference.length() > MAX_REFERENCE_LENGTH) {
+                errors.add("Reference exceeds maximum length of " + MAX_REFERENCE_LENGTH +
+                        " characters (was: " + reference.length() + ")");
+            }
+            if (containsLinebreak(reference)) {
+                errors.add("Reference must not contain linebreaks");
+            }
         }
 
-        if (hasText && text.length() > MAX_TEXT_LENGTH) {
-            errors.add("Text exceeds maximum length of " + MAX_TEXT_LENGTH +
-                    " characters (was: " + text.length() + ")");
+        if (hasText) {
+            if (text.length() > MAX_TEXT_LENGTH) {
+                errors.add("Text exceeds maximum length of " + MAX_TEXT_LENGTH +
+                        " characters (was: " + text.length() + ")");
+            }
+            if (containsLinebreak(text)) {
+                errors.add("Text must not contain linebreaks");
+            }
         }
 
         // Display text validation
-        if (displayText != null && displayText.length() > MAX_DISPLAY_TEXT_LENGTH) {
-            errors.add("Display text exceeds maximum length of " + MAX_DISPLAY_TEXT_LENGTH +
-                    " characters (was: " + displayText.length() + ")");
+        if (displayText != null && !displayText.isEmpty()) {
+            if (displayText.length() > MAX_DISPLAY_TEXT_LENGTH) {
+                errors.add("Display text exceeds maximum length of " + MAX_DISPLAY_TEXT_LENGTH +
+                        " characters (was: " + displayText.length() + ")");
+            }
+            if (containsLinebreak(displayText)) {
+                errors.add("Display text must not contain linebreaks");
+            }
         }
 
         return errors.isEmpty() ? ValidationResult.success() : ValidationResult.failure(errors);
@@ -143,5 +168,15 @@ public final class EpcQrCodeValidator {
                     "Total payload exceeds maximum of " + MAX_PAYLOAD_BYTES + " bytes (was: " + payloadBytes + ")");
         }
         return ValidationResult.success();
+    }
+
+    /**
+     * Checks if a string contains linebreak characters (LF or CR).
+     *
+     * @param value the string to check
+     * @return true if the string contains linebreaks
+     */
+    private static boolean containsLinebreak(String value) {
+        return value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0;
     }
 }
