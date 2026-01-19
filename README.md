@@ -5,11 +5,11 @@ A Java library for generating EPC (European Payments Council) QR Codes for SEPA 
 ## Features
 
 - **PSA Specification Compliant**: Fully implements the Austrian banking standard for payment QR codes
-- **SVG Output**: Generates scalable vector graphics for resolution-independent QR codes
+- **Multiple Output Formats**: Generates both SVG (vector) and PNG (bitmap) QR codes
 - **Comprehensive Validation**: Validates IBAN (with checksum), BIC, amounts, and all field constraints
 - **Fluent Builder API**: Easy-to-use builder pattern for constructing payment data
 - **Java 25**: Leverages modern Java features (records, pattern matching, string templates)
-- **Minimal Dependencies**: Only requires ZXing core library
+- **Minimal Dependencies**: Only requires ZXing core library (uses Java's built-in ImageIO for PNG)
 
 ## Requirements
 
@@ -43,9 +43,10 @@ EpcQrCodeData data = EpcQrCode.builder()
     .iban("AT682011131032423628")
     .build();
 
-// Generate SVG
+// Generate QR codes
 EpcQrCodeGenerator generator = new EpcQrCodeGenerator();
-String svg = generator.generateSvg(data);
+String svg = generator.generateSvg(data);           // SVG output
+byte[] png = generator.generatePng(data);           // PNG output
 ```
 
 ### Full Example with All Fields
@@ -66,9 +67,14 @@ EpcQrCodeGenerator generator = new EpcQrCodeGenerator();
 
 // Generate with custom module size (6 pixels per module)
 String svg = generator.generateSvg(data, 6);
+byte[] png = generator.generatePng(data, 8);
 
-// Save to file
+// Save to files
 Files.writeString(Path.of("payment-qr.svg"), svg);
+Files.write(Path.of("payment-qr.png"), png);
+
+// Or save PNG directly with convenience method
+generator.generatePngFile(data, 10, Path.of("high-res-qr.png"));
 ```
 
 ### Using Text Instead of Reference
@@ -84,6 +90,7 @@ EpcQrCodeData data = EpcQrCode.builder()
     .build();
 
 String svg = new EpcQrCodeGenerator().generateSvg(data);
+byte[] png = new EpcQrCodeGenerator().generatePng(data);
 ```
 
 ## API Reference
@@ -111,6 +118,9 @@ String svg = new EpcQrCodeGenerator().generateSvg(data);
 |--------|-------------|
 | `generateSvg(EpcQrCodeData)` | Generate SVG with default module size (4 pixels) |
 | `generateSvg(EpcQrCodeData, int)` | Generate SVG with custom module size |
+| `generatePng(EpcQrCodeData)` | Generate PNG with default module size (8 pixels) |
+| `generatePng(EpcQrCodeData, int)` | Generate PNG with custom module size |
+| `generatePngFile(EpcQrCodeData, int, Path)` | Generate PNG and save directly to file |
 | `formatPayload(EpcQrCodeData)` | Get the raw EPC payload string |
 
 ### Enums
@@ -149,7 +159,9 @@ String svg = new EpcQrCodeGenerator().generateSvg(data);
 
 **Note:** Reference and Text are mutually exclusive. Setting one clears the other.
 
-## SVG Output
+## Output Formats
+
+### SVG Output
 
 The generated SVG includes:
 - Proper quiet zone (4 modules) as required by QR code specification
@@ -164,6 +176,28 @@ Example SVG structure:
   <rect x="16" y="16" width="4" height="4" fill="black"/>
   <!-- ... more modules ... -->
 </svg>
+```
+
+### PNG Output
+
+The generated PNG includes:
+- Proper quiet zone (4 modules) as required by QR code specification
+- RGB color space for maximum compatibility
+- White background with black modules
+- Default module size of 8 pixels (higher quality than SVG default)
+- Error correction level M (~15% redundancy) per PSA spec
+- Maximum QR version 13 (69x69 modules)
+
+PNG Usage Examples:
+```java
+// Generate PNG as byte array
+byte[] png = generator.generatePng(data);
+
+// Generate PNG with custom module size
+byte[] highResPng = generator.generatePng(data, 16);
+
+// Save PNG directly to file (creates parent directories if needed)
+generator.generatePngFile(data, 12, Path.of("output/qrcodes/payment.png"));
 ```
 
 ## Error Handling
@@ -207,7 +241,7 @@ mvn package
 src/main/java/at/klickmagiesoftware/epcqr/
 ├── EpcQrCode.java              # Builder entry point
 ├── EpcQrCodeData.java          # Immutable data record
-├── EpcQrCodeGenerator.java     # SVG generation
+├── EpcQrCodeGenerator.java     # SVG and PNG generation
 ├── EpcVersion.java             # Version enum
 ├── CharacterEncoding.java      # Encoding enum
 ├── validation/
@@ -219,7 +253,8 @@ src/main/java/at/klickmagiesoftware/epcqr/
 ├── format/
 │   └── EpcPayloadFormatter.java # Payload formatting
 ├── render/
-│   └── SvgRenderer.java        # SVG rendering
+│   ├── SvgRenderer.java        # SVG rendering
+│   └── PngRenderer.java        # PNG rendering
 └── exception/
     ├── EpcQrCodeException.java # Base exception
     ├── ValidationException.java
